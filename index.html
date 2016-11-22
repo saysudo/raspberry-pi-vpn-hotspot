@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=640">
+
+    <link rel="stylesheet" href="stylesheets/core.css" media="screen">
+    <link rel="stylesheet" href="stylesheets/mobile.css" media="handheld, only screen and (max-device-width:640px)">
+    <link rel="stylesheet" href="stylesheets/github-light.css">
+
+    <script type="text/javascript" src="javascripts/modernizr.js"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script type="text/javascript" src="javascripts/headsmart.min.js"></script>
+    <script type="text/javascript">
+      $(document).ready(function () {
+        $('#main_content').headsmart()
+      })
+    </script>
+    <title>Raspberry-pi-vpn-hotspot by saysudo</title>
+  </head>
+
+  <body>
+    <a id="forkme_banner" href="https://github.com/saysudo/raspberry-pi-vpn-hotspot">View on GitHub</a>
+    <div class="shell">
+
+      <header>
+        <span class="ribbon-outer">
+          <span class="ribbon-inner">
+            <h1>Raspberry-pi-vpn-hotspot</h1>
+            <h2>Raspberry Pi 3 as VPN Hotspot</h2>
+          </span>
+          <span class="left-tail"></span>
+          <span class="right-tail"></span>
+        </span>
+      </header>
+
+      <section id="downloads">
+        <span class="inner">
+          <a href="https://github.com/saysudo/raspberry-pi-vpn-hotspot/zipball/master" class="zip"><em>download</em> .ZIP</a><a href="https://github.com/saysudo/raspberry-pi-vpn-hotspot/tarball/master" class="tgz"><em>download</em> .TGZ</a>
+        </span>
+      </section>
+
+
+      <span class="banner-fix"></span>
+
+
+      <section id="main_content">
+        <h1>
+<a id="raspberry-pi-3-model-b-as-vpn-hotspot---simple-tutorial" class="anchor" href="#raspberry-pi-3-model-b-as-vpn-hotspot---simple-tutorial" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Raspberry Pi 3 Model B as VPN Hotspot - Simple Tutorial</h1>
+
+<p>Using TP-Link Wi-Fi adapter to connect to my router.
+You can use ethernet instead.
+Raspbian Jessie With Pixel - 9/16</p>
+
+<p>Let's start! (May seem long but... it ain't that much!)</p>
+
+<p><strong>Download first:</strong></p>
+
+<pre><code>sudo apt-get update
+sudo apt-get install openvpn hostapd isc-dhcp-server
+</code></pre>
+
+<p><strong>VPN Setup:</strong></p>
+
+<p>I can not help much on this part and you will have to contact your VPN provider for getting the setup ready!
+Why? Cause each provider has different set of configurations.</p>
+
+<p>But... some things you should remember:
+Once you have your config and login details, all you need to do (in most cases), copy them to openvpn
+directory. Then it's easy!</p>
+
+<p>Example:</p>
+
+<pre><code>sudo cp ABC.conf /etc/openvpn
+</code></pre>
+
+<p>Test:</p>
+
+<pre><code>sudo service openvpn start
+sudo service openvpn status
+</code></pre>
+
+<p>Status should read "active"</p>
+
+<p><strong>DHCP Service:</strong></p>
+
+<pre><code>sudo nano /etc/dhcp/dhcpd.conf
+</code></pre>
+
+<p>Add # to below lines:</p>
+
+<pre><code>option domain-name "example.org";
+option domain-name-servers ns1.example.org, ns2.example.org;
+</code></pre>
+
+<p>Remove # from this line:</p>
+
+<pre><code>#authoritative;
+</code></pre>
+
+<p>Scroll down to the bottom and add below:</p>
+
+<pre><code>subnet 192.168.42.0 netmask 255.255.255.0 {
+    range 192.168.42.10 192.168.42.50;
+    option broadcast-address 192.168.42.255;
+    option routers 192.168.42.1;
+    default-lease-time 600;
+    max-lease-time 7200;
+    option domain-name "local";
+    option domain-name-servers 8.8.8.8, 8.8.4.4;
+}
+</code></pre>
+
+<pre><code>sudo nano /etc/default/isc-dhcp-server
+</code></pre>
+
+<p>Add wlan0 like this:</p>
+
+<pre><code>INTERFACES="wlan0"
+</code></pre>
+
+<p><strong>Network Interfaces:</strong></p>
+
+<pre><code>sudo ifdown wlan0
+sudo nano /etc/network/interfaces
+</code></pre>
+
+<p>Configure like this:</p>
+
+<pre><code>auto lo
+
+iface lo inet loopback
+iface eth0 inet dhcp
+
+allow-hotplug wlan0
+
+iface wlan0 inet static
+  address 192.168.42.1
+  netmask 255.255.255.0
+  post-up iw dev $IFACE set power_save off
+
+allow-hotplug wlan1
+
+iface wlan1 inet manual
+  wpa-roam /etc/wpa_supplicant/wpa_supplicant.conf
+
+up iptables-restore &lt; /etc/iptables.nat.vpn.secure
+</code></pre>
+
+<p><strong>Assign Static IP to wlan0:</strong></p>
+
+<pre><code>sudo ifconfig wlan0 192.168.42.1
+</code></pre>
+
+<p><strong>Hostapd:</strong></p>
+
+<pre><code>sudo nano /etc/hostapd/hostapd.conf
+</code></pre>
+
+<p>Then fill it like this:</p>
+
+<pre><code>interface=wlan0
+ssid=EXAMPLE
+hw_mode=g
+channel=6
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=STRONG_PASSWORD
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
+</code></pre>
+
+<pre><code>sudo nano /etc/default/hostapd
+</code></pre>
+
+<p>Remove # and add /etc/hostapd/hostapd.conf between quotes:</p>
+
+<pre><code>DAEMON_CONF="/etc/hostapd/hostapd.conf"
+</code></pre>
+
+<p><strong>Network Address Translation:</strong></p>
+
+<pre><code>sudo nano /etc/sysctl.conf
+</code></pre>
+
+<p>Look with care here and remove # from below or add it without # 
+to the very bottom of the file:</p>
+
+<pre><code># net.ipv4.ip_forward=1
+</code></pre>
+
+<p>Get it ready now:</p>
+
+<pre><code>sudo sh -c "echo 1 &gt; /proc/sys/net/ipv4/ip_forward"
+</code></pre>
+
+<p><strong>IPTables Rules:</strong>
+Pay attention here!
+Copy and paste below:</p>
+
+<pre><code>sudo iptables -A INPUT -i tun0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+sudo iptables -A INPUT -i tun0 -j DROP
+sudo iptables -t nat -A POSTROUTING -o tun0 -j MASQUERADE
+sudo sh -c "iptables-save &gt; /etc/iptables.nat.vpn.secure"
+</code></pre>
+
+<p><strong>Time to test and start them:</strong></p>
+
+<p>Hotspot:</p>
+
+<pre><code>sudo /usr/sbin/hostapd /etc/hostapd/hostapd.conf
+</code></pre>
+
+<p>Hit Ctrl+C to cancel the test!</p>
+
+<p>DHCP and Hostapd Test:</p>
+
+<pre><code>sudo service hostapd start
+sudo service isc-dhcp-server start
+</code></pre>
+
+<p>Check their status now:</p>
+
+<pre><code>sudo service hostapd status
+sudo service isc-dhcp-server status
+</code></pre>
+
+<p>Make them Auto-Boot on startup:</p>
+
+<pre><code> sudo update-rc.d hostapd enable
+ sudo update-rc.d isc-dhcp-server enable
+</code></pre>
+
+<p><strong>What are you waiting for?</strong></p>
+
+<pre><code>sudo reboot
+</code></pre>
+      </section>
+
+      <footer>
+        <span class="ribbon-outer">
+          <span class="ribbon-inner">
+            <p>this project by <a href="https://github.com/saysudo">saysudo</a> can be found on <a href="https://github.com/saysudo/raspberry-pi-vpn-hotspot">GitHub</a></p>
+          </span>
+          <span class="left-tail"></span>
+          <span class="right-tail"></span>
+        </span>
+        <p>Generated with <a href="https://pages.github.com">GitHub Pages</a> using Merlot</p>
+        <span class="octocat"></span>
+      </footer>
+
+    </div>
+
+    
+  </body>
+</html>
